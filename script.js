@@ -3,21 +3,20 @@ const ctx = canvas.getContext("2d");
 
 //Set canvas to window size
 canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
+canvas.height = window.innerHeight;
 
 //Statics
 //const mapWidth = 20;
 //const mapHeight = 15;
 
-
 //Dynamics
-const tileSize = 32;
+const tileSize = 16;
 const mapWidth = canvas.clientWidth / tileSize;
 const mapHeight = canvas.clientHeight / tileSize;
 
-
 // Game variables and functions will go here
 var map = [];
+var path = [];
 
 function gameLoop() {
   // Clear the canvas
@@ -35,13 +34,13 @@ function drawMap() {
     for (let x = 0; x < mapWidth; x++) {
       switch (map[y][x]) {
         case 0:
-            ctx.fillStyle = "#a7a7a7";
+          ctx.fillStyle = "#a7a7a7";
           break;
         case 1:
-            ctx.fillStyle = "#3f3f3f";
+          ctx.fillStyle = "#3f3f3f";
           break;
         case 2:
-            ctx.fillStyle = "#c18274";
+          ctx.fillStyle = "#c18274";
           break;
         default:
           break;
@@ -64,8 +63,8 @@ function findPath(start, end, map) {
   openSet.add(`${start.x},${start.y}`);
 
   function heuristicCostEstimate(a, b) {
-    // Manhattan distance heuristic
-    return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+    // Consider using Euclidean distance or other heuristics for better performance
+    return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2);
   }
 
   function reconstructPath(current) {
@@ -84,18 +83,19 @@ function findPath(start, end, map) {
     for (const pos of openSet) {
       const x = parseInt(pos.split(",")[0], 10);
       const y = parseInt(pos.split(",")[1], 10);
-      if (fScore.get(`${x},${y}`) < lowestFScore) {
-        lowestFScore = fScore.get(`${x},${y}`);
+      const f = fScore.get(`${x},${y}`);
+      if (f < lowestFScore) {
+        lowestFScore = f;
         current = { x, y };
       }
     }
 
+    openSet.delete(`${current.x},${current.y}`);
+    closedSet.add(`${current.x},${current.y}`);
+
     if (current.x === end.x && current.y === end.y) {
       return reconstructPath(current);
     }
-
-    openSet.delete(`${current.x},${current.y}`);
-    closedSet.add(`${current.x},${current.y}`);
 
     const neighbors = [
       { x: current.x - 1, y: current.y },
@@ -109,18 +109,20 @@ function findPath(start, end, map) {
         neighbor.x < 0 ||
         neighbor.x >= mapWidth ||
         neighbor.y < 0 ||
-        neighbor.y >= mapHeight
-      )
+        neighbor.y >= mapHeight ||
+        map[neighbor.y][neighbor.x] === 1
+      ) {
         continue;
-      if (map[neighbor.y][neighbor.x] === 1) continue; // Obstacle
+      }
 
       const tentativeGScore = gScore.get(`${current.x},${current.y}`) + 1;
 
       if (
         closedSet.has(`${neighbor.x},${neighbor.y}`) &&
         tentativeGScore >= gScore.get(`${neighbor.x},${neighbor.y}`)
-      )
+      ) {
         continue;
+      }
 
       if (
         !openSet.has(`${neighbor.x},${neighbor.y}`) ||
@@ -128,10 +130,10 @@ function findPath(start, end, map) {
       ) {
         cameFrom[`${neighbor.x},${neighbor.y}`] = current;
         gScore.set(`${neighbor.x},${neighbor.y}`, tentativeGScore);
-        fScore.set(
-          `${neighbor.x},${neighbor.y}`,
-          tentativeGScore + heuristicCostEstimate(neighbor, end)
-        );
+        const fScoreValue =
+          tentativeGScore + heuristicCostEstimate(neighbor, end);
+        fScore.set(`${neighbor.x},${neighbor.y}`, fScoreValue);
+
         openSet.add(`${neighbor.x},${neighbor.y}`);
       }
     }
@@ -140,7 +142,7 @@ function findPath(start, end, map) {
   return []; // No path found
 }
 
-function generateMapWithPath() {
+function generateMap() {
   const map = [];
 
   // Generate the base map
@@ -152,30 +154,34 @@ function generateMapWithPath() {
   }
 
   // Randomly select start and end points
-  const startX = 0;
-  let startY = Math.floor(Math.random() * mapHeight);
-  while(map[startY][startX] === 1) {
-    startY = Math.floor(Math.random() * mapHeight);
-  }
-  const endX = mapWidth - 1;
-  let endY = Math.floor(Math.random() * mapHeight);
-  while(map[endY][endX] === 1) {
-    endX = Math.floor(Math.random() * mapWidth);
-  }
-
-  // Find a path using A* or another algorithm
-  const path = findPath({ x: startX, y: startY }, { x: endX, y: endY }, map);
-  if(path === undefined || path == []) {
-    return generateMapWithPath();
-  }
-
-  // Carve the path into the map
-  for (const point of path) {
-    map[point.y][point.x] = 2; // Mark as path tile
-  }
 
   return map;
 }
 
-map = generateMapWithPath();
+function generatePath() {
+  const startX = 0;
+  let startY = Math.floor(Math.random() * mapHeight);
+  while (map[startY][startX] === 1) {
+    startY = Math.floor(Math.random() * mapHeight);
+  }
+  const endX = mapWidth - 1;
+  let endY = Math.floor(Math.random() * mapHeight);
+  while (map[endY][endX] === 1) {
+    endX = Math.floor(Math.random() * mapWidth);
+  }
+  // Find a path using A* or another algorithm
+  const path = findPath({ x: startX, y: startY }, { x: endX, y: endY }, map);
+  if (path === undefined || path == []) {
+    return generateMapWithPath();
+  }
+
+  for (const point of path) {
+    map[point.y][point.x] = 2;
+  }
+
+  return path;
+}
+
+map = generateMap();
+path = generatePath();
 gameLoop();
