@@ -31,6 +31,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let gameStarted = false;
   let enemyqueueCooldown = 0;
   let menuOpen = false;
+  let firstrun = true;
 
   // Base health
   let baseHealth = 1000;
@@ -44,6 +45,7 @@ document.addEventListener("DOMContentLoaded", () => {
       range: 3,
       damage: 1,
       reloadSpeed: 1000,
+      level: 1,
     },
     sniper: {
       name: "Sniper Tower",
@@ -52,6 +54,7 @@ document.addEventListener("DOMContentLoaded", () => {
       range: 7,
       damage: 3,
       reloadSpeed: 3000,
+      level: 1,
     },
     cannon: {
       name: "Cannon Tower",
@@ -60,6 +63,16 @@ document.addEventListener("DOMContentLoaded", () => {
       range: 4,
       damage: 5,
       reloadSpeed: 2000,
+      level: 1,
+    },
+    railcannon: {
+      name: "Railcannon",
+      cost: 1500,
+      color: "#fff",
+      range: 15,
+      damage: 100,
+      reloadSpeed: 10000,
+      level: 1,
     },
   };
 
@@ -92,6 +105,13 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
   function initMap() {
+    towers = [];
+    enemies = [];
+    enemyqueue = [];
+    waveNumber = 0;
+    money = 100;
+    baseHealth = 1000;
+    enemyqueueCooldown = 0;
     rocks.length = 0;
     for (let y = 0; y < mapHeight; y++) {
       map[y] = [];
@@ -103,6 +123,11 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
     }
+    initPath();
+    updateMoneyLabel();
+    updateWaveCounter();
+    updateTowerSpawners();
+    updateHealtLabel();
   }
 
   function isValid(x, y) {
@@ -205,7 +230,7 @@ document.addEventListener("DOMContentLoaded", () => {
     return (
       map[y] &&
       map[y][x] === "tower" &&
-      money >= towerStats[getTowerAt(x,y).type].cost * getTowerAt(x,y).level
+      money >= towerStats[getTowerAt(x, y).type].cost * getTowerAt(x, y).level
     );
   }
 
@@ -222,7 +247,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function upgradeTower(x, y) {
     if (canUpgradeTower(x, y)) {
       getTowerAt(x, y).level++;
-      money -= towerStats[getTowerAt(x,y).type].cost * getTowerAt(x,y).level; // Deduct money for upgrading a tower
+      money -= towerStats[getTowerAt(x, y).type].cost * getTowerAt(x, y).level; // Deduct money for upgrading a tower
       updateMoneyLabel(); // Update the money label
     }
   }
@@ -294,8 +319,11 @@ document.addEventListener("DOMContentLoaded", () => {
       } else {
         for (const enemy of enemies) {
           if (isEnemyInRange(tower, enemy)) {
-            enemy.health -= towerStats[tower.type].damage * Math.floor(Math.sqrt(tower.level));
-            tower.reloadcooldown = tower.type.reloadSpeed / Math.floor(Math.sqrt(tower.level));
+            enemy.health -=
+              towerStats[tower.type].damage * Math.sqrt(tower.level);
+            enemy.health = Math.ceil(enemy.health);
+            tower.reloadcooldown =
+              tower.type.reloadSpeed / Math.floor(Math.sqrt(tower.level));
             if (enemy.health <= 0) {
               money += enemy.money; // Increment money by the enemy's value
               updateMoneyLabel(); // Update the money label
@@ -324,9 +352,21 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
     for (const tower of towers) {
-        ctx.fillStyle = "#000";
-        ctx.font = tileSize + "px Arial";
-        ctx.fillText(tower.level, (tower.x + 0.5) * tileSize, (tower.y + 0.5) * tileSize);
+      ctx.fillStyle = towerStats[tower.type].color;
+      ctx.beginPath();
+      ctx.moveTo(tower.x * tileSize, tower.y * tileSize);
+      ctx.lineTo((tower.x + 1) * tileSize, tower.y * tileSize);
+      ctx.lineTo((tower.x + 1) * tileSize, (tower.y + 1) * tileSize);
+      ctx.lineTo(tower.x * tileSize, (tower.y + 1) * tileSize);
+      ctx.lineTo(tower.x * tileSize, tower.y * tileSize);
+      ctx.stroke();
+      ctx.fillStyle = "#000";
+      ctx.font = tileSize + "px Arial";
+      ctx.fillText(
+        tower.level,
+        (tower.x + 0.5) * tileSize,
+        (tower.y + 0.5) * tileSize
+      );
     }
   }
   function drawEnemies() {
@@ -366,6 +406,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!gameStarted) {
       gameStarted = true;
       startButton.disabled = true; // Disable start button after starting the game
+      if (!firstrun) {
+        initMap();
+      }
+      firstrun = false;
     }
   });
   skipButton.addEventListener("click", function () {
@@ -392,33 +436,28 @@ document.addEventListener("DOMContentLoaded", () => {
         drawEnemies();
       }
     }
-    if (baseHealth > 0) {
-      requestAnimationFrame(gameLoop);
-    }
-  }
-  function waveFunc() {
-    if (baseHealth > 0) {
-      waveNumber++;
-      updateWaveCounter();
-      money += waveNumber * 5;
-      updateMoneyLabel();
-      for (let i = 0; i < Math.ceil(Math.sqrt(waveNumber)); i++) {
-        spawnEnemy();
-      }
-    } else {
+    if (!(baseHealth > 0)) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.font = Math.min(canvas.width, canvas.height) / 10 + "px Arial";
       ctx.textAlign = "center";
       ctx.fillText("Game Over", canvas.width / 2, canvas.height / 2);
+      startButton.disabled = false;
+      gameStarted = false;
+    }
+    requestAnimationFrame(gameLoop);
+  }
+  function waveFunc() {
+    waveNumber++;
+    updateWaveCounter();
+    money += waveNumber * 5;
+    updateMoneyLabel();
+    for (let i = 0; i < Math.ceil(Math.sqrt(waveNumber)); i++) {
+      spawnEnemy();
     }
   }
 
   // Initialize the game
 
   initMap();
-  initPath();
-  updateMoneyLabel();
-  updateWaveCounter();
   gameLoop();
-  updateTowerSpawners();
 });
