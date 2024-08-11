@@ -1,13 +1,22 @@
 body {
     margin: 0;
     font-family: Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
 }
 
 #towerSelector {
     position: fixed;
-    top: 10px;
-    left: 10px;
+    top: 0;
+    left: 0;
+    width: 100%;
+    background-color: #ddd; /* Light background for visibility */
+    padding: 10px;
+    box-sizing: border-box;
     z-index: 1;
+    display: flex;
+    justify-content: space-between;
 }
 
 #moneyLabel {
@@ -17,8 +26,15 @@ body {
     z-index: 1;
 }
 
+#waveCounter {
+    position: fixed;
+    top: 50px;
+    right: 10px;
+    z-index: 1;
+}
+
 #gameCanvas {
-    display: block;
-    margin: 0 auto;
+    flex: 1; /* Make canvas take up remaining space */
     background: #f0f0f0; /* Light gray background for canvas */
+    border-top: 2px solid #333; /* Add a border to separate the canvas from the menu */
 }
