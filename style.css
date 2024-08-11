@@ -29,7 +29,6 @@ button {
 #gameCanvas {
     flex: 1; /* Make canvas take up remaining space */
     background: #f0f0f0; /* Light gray background for canvas */
-    border-top: 2px solid #333; /* Add a border to separate the canvas from the menu */
     top: 10vh;
     position: relative;
 }

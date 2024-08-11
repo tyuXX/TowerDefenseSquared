@@ -15,8 +15,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const mapHeight = 30;
   const tileSize = 32;
 
-  canvas.width = mapWidth * tileSize;
-  canvas.height = mapHeight * tileSize;
+  canvas.width = visualViewport.width;
+  canvas.height = visualViewport.height;
 
   const map = [];
   const rocks = [];
@@ -192,14 +192,38 @@ document.addEventListener("DOMContentLoaded", () => {
     );
   }
 
+  function getTowerAt(x, y) {
+    for (let i = 0; i < towers.length; i++) {
+      if (towers[i].x === x && towers[i].y === y) {
+        return towers[i];
+      }
+    }
+    return null;
+  }
+
+  function canUpgradeTower(x, y) {
+    return (
+      map[y] &&
+      map[y][x] === "tower" &&
+      money >= towerStats[getTowerAt(x,y).type].cost * getTowerAt(x,y).level
+    );
+  }
+
   function placeTower(x, y) {
     if (canPlaceTower(x, y)) {
-      towers.push({ x, y, reloadcooldown: 0, type: selectedTower });
+      towers.push({ x, y, reloadcooldown: 0, level: 1, type: selectedTower });
       map[y][x] = "tower";
       money -=
         towerStats[selectedTower].cost * Math.ceil(Math.sqrt(towers.length)); // Deduct money for placing a tower
       updateMoneyLabel(); // Update the money label
       updateTowerSpawners(); // Update the tower spawners
+    }
+  }
+  function upgradeTower(x, y) {
+    if (canUpgradeTower(x, y)) {
+      getTowerAt(x, y).level++;
+      money -= towerStats[getTowerAt(x,y).type].cost * getTowerAt(x,y).level; // Deduct money for upgrading a tower
+      updateMoneyLabel(); // Update the money label
     }
   }
 
@@ -270,7 +294,8 @@ document.addEventListener("DOMContentLoaded", () => {
       } else {
         for (const enemy of enemies) {
           if (isEnemyInRange(tower, enemy)) {
-            enemy.health -= towerStats[tower.type].damage;
+            enemy.health -= towerStats[tower.type].damage * Math.floor(Math.sqrt(tower.level));
+            tower.reloadcooldown = tower.type.reloadSpeed / Math.floor(Math.sqrt(tower.level));
             if (enemy.health <= 0) {
               money += enemy.money; // Increment money by the enemy's value
               updateMoneyLabel(); // Update the money label
@@ -290,13 +315,18 @@ document.addEventListener("DOMContentLoaded", () => {
         } else if (map[y][x] === "path") {
           ctx.fillStyle = "#d2b48c"; // Light brown
         } else if (map[y][x] === "tower") {
-          const tower = towers.find((t) => t.x === x && t.y === y);
+          const tower = getTowerAt(x, y);
           ctx.fillStyle = tower ? towerStats[tower.type].color : "#0f0";
         } else {
           ctx.fillStyle = "#0f0"; // Green for the ground
         }
         ctx.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
       }
+    }
+    for (const tower of towers) {
+        ctx.fillStyle = "#000";
+        ctx.font = tileSize + "px Arial";
+        ctx.fillText(tower.level, (tower.x + 0.5) * tileSize, (tower.y + 0.5) * tileSize);
     }
   }
   function drawEnemies() {
@@ -317,12 +347,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
   canvas.addEventListener("click", function (event) {
     const { x, y } = getMousePosition(event);
+    upgradeTower(x, y);
     placeTower(x, y);
   });
 
   towerSelector.addEventListener("click", function (event) {
     if (event.target.tagName === "BUTTON") {
-      selectedTower = event.target.getAttribute("data-tower");
+      if (
+        event.target.getAttribute("data-tower") !== selectedTower &&
+        event.target.getAttribute("data-tower") !== undefined
+      ) {
+        selectedTower = event.target.getAttribute("data-tower");
+      }
     }
   });
 
@@ -347,12 +383,14 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   function gameLoop() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    drawMap();
-    if (gameStarted) {
-      updateEnemies();
-      damageEnemies(); // Check for towers damaging enemies
-      drawEnemies();
+    if (!menuOpen) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawMap();
+      if (gameStarted) {
+        updateEnemies();
+        damageEnemies(); // Check for towers damaging enemies
+        drawEnemies();
+      }
     }
     if (baseHealth > 0) {
       requestAnimationFrame(gameLoop);
