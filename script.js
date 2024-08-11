@@ -21,28 +21,50 @@ document.addEventListener("DOMContentLoaded", () => {
   const path = [];
   let towers = [];
   let enemies = [];
+  let enemyqueue = [];
   let money = 100; // Initial money
   let selectedTower = "basic"; // Default selected tower
   let waveNumber = 0;
-  let waveInterval = 5000; // 5 seconds between waves
-  let enemySpeed = 1; // Speed of enemies
+  let enemySpeed = 0.5; // Speed of enemies
   let gameStarted = false;
+  let enemyqueueCooldown = 0;
 
   // Base health
-  let baseHealth = 100;
+  let baseHealth = 1000;
 
   // Tower stats
   const towerStats = {
-    basic: { cost: 10, color: "#f00", range: 3, damage: 1, reloadSpeed: 1000 },
-    sniper: { cost: 20, color: "#00f", range: 7, damage: 3, reloadSpeed: 3000 },
-    cannon: { cost: 30, color: "#ff0", range: 4, damage: 5, reloadSpeed: 2000 },
+    basic: {
+      name: "Basic Tower",
+      cost: 10,
+      color: "#f00",
+      range: 3,
+      damage: 1,
+      reloadSpeed: 1000,
+    },
+    sniper: {
+      name: "Sniper Tower",
+      cost: 20,
+      color: "#00f",
+      range: 7,
+      damage: 3,
+      reloadSpeed: 3000,
+    },
+    cannon: {
+      name: "Cannon Tower",
+      cost: 30,
+      color: "#ff0",
+      range: 4,
+      damage: 5,
+      reloadSpeed: 2000,
+    },
   };
 
   // Enemy stats
   const enemyStats = {
-    grunt: { health: 10, money: 5, color: "#0f0", speed: 0.5 },
-    fast: { health: 5, money: 3, color: "#f00", speed: 1 },
-    tank: { health: 20, money: 10, color: "#00f", speed: 0.25 },
+    grunt: { health: 10, money: 3, color: "#0f0", speed: 0.5 },
+    fast: { health: 5, money: 1, color: "#f00", speed: 1 },
+    tank: { health: 20, money: 5, color: "#00f", speed: 0.25 },
   };
 
   function updateMoneyLabel() {
@@ -52,10 +74,20 @@ document.addEventListener("DOMContentLoaded", () => {
   function updateWaveCounter() {
     waveCounter.textContent = `Wave: ${waveNumber}`;
   }
-  function updateHealtLabel(){
+  function updateHealtLabel() {
     healtLabel.textContent = `Healt: ${baseHealth}`;
   }
 
+  function updateTowerSpawners() {
+    let array = document.getElementsByClassName("towerbutton");
+    for (let index = 0; index < array.length; index++) {
+      array[index].textContent =
+        towerStats[array[index].getAttribute("data-tower")].name +
+        " $" +
+        towerStats[array[index].getAttribute("data-tower")].cost *
+          Math.ceil(Math.sqrt(towers.length));
+    }
+  }
   function initMap() {
     rocks.length = 0;
     for (let y = 0; y < mapHeight; y++) {
@@ -150,16 +182,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function canPlaceTower(x, y) {
     return (
-      map[y] && map[y][x] === "empty" && money >= towerStats[selectedTower].cost
+      map[y] &&
+      map[y][x] === "empty" &&
+      money >=
+        towerStats[selectedTower].cost * Math.ceil(Math.sqrt(towers.length))
     );
   }
 
   function placeTower(x, y) {
     if (canPlaceTower(x, y)) {
-      towers.push({ x, y, type: selectedTower });
+      towers.push({ x, y, reloadcooldown: 0, type: selectedTower });
       map[y][x] = "tower";
-      money -= towerStats[selectedTower].cost; // Deduct money for placing a tower
+      money -=
+        towerStats[selectedTower].cost * Math.ceil(Math.sqrt(towers.length)); // Deduct money for placing a tower
       updateMoneyLabel(); // Update the money label
+      updateTowerSpawners(); // Update the tower spawners
     }
   }
 
@@ -176,10 +213,17 @@ document.addEventListener("DOMContentLoaded", () => {
       color: enemyStats[type].color,
       pathIndex: 0, // To follow the path
     };
-    enemies.push(newEnemy);
+    enemyqueue.push(newEnemy);
   }
 
   function updateEnemies() {
+    if (enemyqueue.length > 0) {
+      if (enemyqueueCooldown === 0) {
+        enemies.push(enemyqueue.shift());
+        enemyqueueCooldown = 3;
+      }
+      enemyqueueCooldown--;
+    }
     for (const enemy of enemies) {
       if (enemy.pathIndex < path.length) {
         const target = path[enemy.pathIndex];
@@ -201,6 +245,9 @@ document.addEventListener("DOMContentLoaded", () => {
         enemies.splice(enemies.indexOf(enemy), 1); // Remove enemy
       }
     }
+    if (enemyqueue.length === 0 && enemies.length === 0) {
+      waveFunc();
+    }
   }
 
   function isEnemyInRange(tower, enemy) {
@@ -212,13 +259,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function damageEnemies() {
     for (const tower of towers) {
-      for (const enemy of enemies) {
-        if (isEnemyInRange(tower, enemy)) {
-          enemy.health -= towerStats[tower.type].damage;
-          if (enemy.health <= 0) {
-            money += enemy.money; // Increment money by the enemy's value
-            updateMoneyLabel(); // Update the money label
-            enemies.splice(enemies.indexOf(enemy), 1); // Remove dead enemy
+      if (tower.reloadcooldown > 0) {
+        tower.reloadcooldown--;
+      } else {
+        for (const enemy of enemies) {
+          if (isEnemyInRange(tower, enemy)) {
+            enemy.health -= towerStats[tower.type].damage;
+            if (enemy.health <= 0) {
+              money += enemy.money; // Increment money by the enemy's value
+              updateMoneyLabel(); // Update the money label
+              enemies.splice(enemies.indexOf(enemy), 1); // Remove dead enemy
+            }
           }
         }
       }
@@ -251,13 +302,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function getMousePosition(event) {
     const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;    // Scaling factor in the x direction
-    const scaleY = canvas.height / rect.height;  // Scaling factor in the y direction
-    const x = Math.floor((event.clientX - rect.left) * scaleX / tileSize);
-    const y = Math.floor((event.clientY - rect.top) * scaleY / tileSize);
+    const scaleX = canvas.width / rect.width; // Scaling factor in the x direction
+    const scaleY = canvas.height / rect.height; // Scaling factor in the y direction
+    const x = Math.floor(((event.clientX - rect.left) * scaleX) / tileSize);
+    const y = Math.floor(((event.clientY - rect.top) * scaleY) / tileSize);
     return { x, y };
-}
-
+  }
 
   canvas.addEventListener("click", function (event) {
     const { x, y } = getMousePosition(event);
@@ -273,15 +323,14 @@ document.addEventListener("DOMContentLoaded", () => {
   startButton.addEventListener("click", function () {
     if (!gameStarted) {
       gameStarted = true;
-      startWaves();
       startButton.disabled = true; // Disable start button after starting the game
     }
   });
   skipButton.addEventListener("click", function () {
     if (gameStarted) {
-        waveFunc();
+      waveFunc();
     }
-  })
+  });
 
   function gameLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -291,27 +340,34 @@ document.addEventListener("DOMContentLoaded", () => {
       damageEnemies(); // Check for towers damaging enemies
       drawEnemies();
     }
-    requestAnimationFrame(gameLoop);
+    if(baseHealth > 0){
+        requestAnimationFrame(gameLoop);
+    }
   }
   function waveFunc() {
-    waveNumber++;
-    updateWaveCounter();
-    money += waveNumber * 10;
-    updateMoneyLabel();
-    for (let i = 0; i < Math.ceil(Math.sqrt(waveNumber)); i++) {
-        spawnEnemy();
+    if (baseHealth > 0) {
+        waveNumber++;
+        updateWaveCounter();
+        money += waveNumber * 10;
+        updateMoneyLabel();
+        for (let i = 0; i < Math.ceil(Math.sqrt(waveNumber)); i++) {
+          spawnEnemy();
+        }
+    }
+    else{
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.font = Math.min(canvas.width,canvas.height)/10 + "px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("Game Over", canvas.width/2, canvas.height/2);
     }
   }
 
   // Initialize the game
+
   initMap();
   initPath();
   updateMoneyLabel();
   updateWaveCounter();
   gameLoop();
-
-  // Wave system
-  function startWaves() {
-    setInterval(() => {waveFunc();}, waveInterval);
-  }
+  updateTowerSpawners();
 });

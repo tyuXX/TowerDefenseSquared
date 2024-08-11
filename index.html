@@ -8,16 +8,17 @@
   </head>
   <body>
     <div id="towerSelector">
-      <button data-tower="basic">Basic Tower</button>
-      <button data-tower="sniper">Sniper Tower</button>
-      <button data-tower="cannon">Cannon Tower</button>
+      <button class="towerbutton" data-tower="basic"></button>
+      <button class="towerbutton" data-tower="sniper"></button>
+      <button class="towerbutton" data-tower="cannon"></button>
       <button id="startButton">Start Game</button>
       <button id="skipButton">Skip wave</button>
       <div id="moneyLabel">Money: $100</div>
       <div id="waveCounter">Wave: 0</div>
-      <div id="healtLabel">Healt: 0</div>
+      <div id="healtLabel">Healt: 1000</div>
     </div>
     <canvas id="gameCanvas"></canvas>
+    <div id="menu"></div>
     <script src="script.js"></script>
   </body>
 </html>
