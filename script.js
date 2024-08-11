@@ -7,6 +7,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const startButton = document.getElementById("startButton");
   const skipButton = document.getElementById("skipButton");
   const healtLabel = document.getElementById("healtLabel");
+  const menuButton1 = document.getElementById("menuButton1");
+  const menuButton2 = document.getElementById("menuButton2");
 
   // Configurable map size
   const mapWidth = 50;
@@ -28,6 +30,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let enemySpeed = 0.5; // Speed of enemies
   let gameStarted = false;
   let enemyqueueCooldown = 0;
+  let menuOpen = false;
 
   // Base health
   let baseHealth = 1000;
@@ -207,7 +210,7 @@ document.addEventListener("DOMContentLoaded", () => {
       x: 0,
       y: 0,
       type: type,
-      health: enemyStats[type].health * Math.ceil(Math.pow(waveNumber, 1.1)),
+      health: enemyStats[type].health * Math.ceil(Math.pow(waveNumber, 1.3)),
       money: enemyStats[type].money, // Money value for the enemy
       speed: enemyStats[type].speed,
       color: enemyStats[type].color,
@@ -220,7 +223,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (enemyqueue.length > 0) {
       if (enemyqueueCooldown === 0) {
         enemies.push(enemyqueue.shift());
-        enemyqueueCooldown = 3;
+        enemyqueueCooldown = Math.max(
+          0,
+          10 - Math.ceil(Math.sqrt(enemyqueue.length))
+        );
       }
       enemyqueueCooldown--;
     }
@@ -331,6 +337,14 @@ document.addEventListener("DOMContentLoaded", () => {
       waveFunc();
     }
   });
+  menuButton1.addEventListener("click", function () {
+    menu.style.display = "block";
+    menuOpen = true;
+  });
+  menuButton2.addEventListener("click", function () {
+    menu.style.display = "none";
+    menuOpen = false;
+  });
 
   function gameLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -340,25 +354,24 @@ document.addEventListener("DOMContentLoaded", () => {
       damageEnemies(); // Check for towers damaging enemies
       drawEnemies();
     }
-    if(baseHealth > 0){
-        requestAnimationFrame(gameLoop);
+    if (baseHealth > 0) {
+      requestAnimationFrame(gameLoop);
     }
   }
   function waveFunc() {
     if (baseHealth > 0) {
-        waveNumber++;
-        updateWaveCounter();
-        money += waveNumber * 10;
-        updateMoneyLabel();
-        for (let i = 0; i < Math.ceil(Math.sqrt(waveNumber)); i++) {
-          spawnEnemy();
-        }
-    }
-    else{
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.font = Math.min(canvas.width,canvas.height)/10 + "px Arial";
-        ctx.textAlign = "center";
-        ctx.fillText("Game Over", canvas.width/2, canvas.height/2);
+      waveNumber++;
+      updateWaveCounter();
+      money += waveNumber * 5;
+      updateMoneyLabel();
+      for (let i = 0; i < Math.ceil(Math.sqrt(waveNumber)); i++) {
+        spawnEnemy();
+      }
+    } else {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.font = Math.min(canvas.width, canvas.height) / 10 + "px Arial";
+      ctx.textAlign = "center";
+      ctx.fillText("Game Over", canvas.width / 2, canvas.height / 2);
     }
   }
 
