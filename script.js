@@ -26,6 +26,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let enemySpeed = 1; // Speed of enemies
     let gameStarted = false;
 
+    // Base health
+    let baseHealth = 100;
+
     // Tower stats
     const towerStats = {
         basic: { cost: 10, color: '#f00', range: 3, damage: 1, reloadSpeed: 1000 },
@@ -35,9 +38,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Enemy stats
     const enemyStats = {
-        grunt: { health: 10, color: '#0f0', speed: 1 },
-        fast: { health: 5, color: '#f00', speed: 2 },
-        tank: { health: 20, color: '#00f', speed: 0.5 },
+        grunt: { health: 10, color: '#0f0', speed: 0.5 },
+        fast: { health: 5, color: '#f00', speed: 1 },
+        tank: { health: 20, color: '#00f', speed: 0.25 },
     };
 
     function updateMoneyLabel() {
@@ -110,19 +113,30 @@ document.addEventListener('DOMContentLoaded', () => {
         const end = { x: mapWidth - 1, y: mapHeight - 1 };
         let generatedPath = findPath(start, end);
 
+        // Regenerate map if no valid path is found
         while (!generatedPath.length) {
             console.log('No valid path found, regenerating map...');
             initMap();
             generatedPath = findPath(start, end);
         }
 
+        // Clear previous path
+        for (const p of path) {
+            if (map[p.y] && map[p.y][p.x] !== undefined) {
+                map[p.y][p.x] = 'empty';
+            }
+        }
+
+        path.length = 0; // Clear the previous path array
+
+        // Mark new path on the map
         for (let i = 0; i < generatedPath.length; i++) {
             const tile = generatedPath[i];
             if (tile && map[tile.y] && map[tile.x] !== undefined) {
                 map[tile.y][tile.x] = 'path';
+                path.push(tile);
             }
         }
-        path.push(...generatedPath);
     }
 
     function canPlaceTower(x, y) {
@@ -141,21 +155,57 @@ document.addEventListener('DOMContentLoaded', () => {
     function spawnEnemy() {
         const enemyTypes = Object.keys(enemyStats);
         const type = enemyTypes[Math.floor(Math.random() * enemyTypes.length)];
-        enemies.push({
+        const newEnemy = {
             x: 0,
             y: 0,
             type: type,
             health: enemyStats[type].health,
             speed: enemyStats[type].speed,
             color: enemyStats[type].color,
-        });
+            pathIndex: 0, // To follow the path
+        };
+        enemies.push(newEnemy);
     }
 
     function updateEnemies() {
         for (const enemy of enemies) {
-            enemy.x += enemy.speed; // Move enemy (basic implementation, replace with proper path following)
-            if (enemy.x >= canvas.width / tileSize) {
-                enemies.splice(enemies.indexOf(enemy), 1); // Remove enemy if it reaches the end
+            if (enemy.pathIndex < path.length) {
+                const target = path[enemy.pathIndex];
+                const dx = target.x * tileSize - enemy.x * tileSize;
+                const dy = target.y * tileSize - enemy.y * tileSize;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                if (distance < enemy.speed) {
+                    enemy.x = target.x;
+                    enemy.y = target.y;
+                    enemy.pathIndex++;
+                } else {
+                    enemy.x += (dx / distance) * enemy.speed;
+                    enemy.y += (dy / distance) * enemy.speed;
+                }
+            } else {
+                // Enemy reached the end of the path
+                baseHealth -= enemy.health; // Subtract enemy's health from base health
+                enemies.splice(enemies.indexOf(enemy), 1); // Remove enemy
+            }
+        }
+    }
+
+    function isEnemyInRange(tower, enemy) {
+        const dx = (enemy.x * tileSize) - (tower.x * tileSize);
+        const dy = (enemy.y * tileSize) - (tower.y * tileSize);
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        return distance <= towerStats[tower.type].range * tileSize;
+    }
+
+    function damageEnemies() {
+        for (const tower of towers) {
+            for (const enemy of enemies) {
+                if (isEnemyInRange(tower, enemy)) {
+                    enemy.health -= towerStats[tower.type].damage;
+                    if (enemy.health <= 0) {
+                        enemies.splice(enemies.indexOf(enemy), 1); // Remove dead enemy
+                    }
+                }
             }
         }
     }
@@ -185,6 +235,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function drawBaseHealth() {
+        ctx.fillStyle = '#000'; // Black outline
+        ctx.fillRect(0, canvas.height, canvas.width, 20); // Background
+        ctx.fillStyle = '#f00'; // Red for health
+        ctx.fillRect(0, canvas.height, (canvas.width * baseHealth) / 100, 20); // Health bar
+        ctx.fillStyle = '#fff'; // White for text
+        ctx.font = '16px Arial';
+        ctx.fillText(`Base Health: ${baseHealth}`, 10, canvas.height + 15);
+    }
+
     function getMousePosition(event) {
         const rect = canvas.getBoundingClientRect();
         const x = Math.floor((event.clientX - rect.left) / tileSize);
@@ -194,7 +254,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     canvas.addEventListener('click', function(event) {
         const { x, y } = getMousePosition(event);
-        placeTower(x, y);
+        if (!gameStarted) {
+            placeTower(x, y);
+        }
     });
 
     towerSelector.addEventListener('click', function(event) {
@@ -216,7 +278,9 @@ document.addEventListener('DOMContentLoaded', () => {
         drawMap();
         if (gameStarted) {
             updateEnemies();
+            damageEnemies(); // Check for towers damaging enemies
             drawEnemies();
+            drawBaseHealth(); // Draw the base health bar
         }
         requestAnimationFrame(gameLoop);
     }
