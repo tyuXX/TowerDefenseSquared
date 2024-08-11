@@ -1,21 +1,23 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Tower Defense Game</title>
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
     <div id="towerSelector">
-        <button data-tower="basic">Basic Tower</button>
-        <button data-tower="sniper">Sniper Tower</button>
-        <button data-tower="cannon">Cannon Tower</button>
-        <button id="startButton">Start Game</button>
+      <button data-tower="basic">Basic Tower</button>
+      <button data-tower="sniper">Sniper Tower</button>
+      <button data-tower="cannon">Cannon Tower</button>
+      <button id="startButton">Start Game</button>
+      <button id="skipButton">Skip wave</button>
+      <div id="moneyLabel">Money: $100</div>
+      <div id="waveCounter">Wave: 0</div>
+      <div id="healtLabel">Healt: 0</div>
     </div>
-    <div id="moneyLabel">Money: $100</div>
-    <div id="waveCounter">Wave: 0</div>
     <canvas id="gameCanvas"></canvas>
     <script src="script.js"></script>
-</body>
+  </body>
 </html>
