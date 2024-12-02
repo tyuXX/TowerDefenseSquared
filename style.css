@@ -123,16 +123,18 @@ button:hover {
 }
 
 #gameContainer {
-    flex: 1;
     display: flex;
-    position: relative;
-    margin-top: 48px;
+    width: 100%;
+    height: calc(100vh - 60px); /* Adjust based on your header/UI height */
+    overflow: hidden;
 }
 
 #gameCanvas {
-    flex: 1;
-    background: var(--secondary);
-    position: relative;
+    margin: auto;
+    display: block;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
 }
 
 .sidebar {

@@ -13,12 +13,34 @@ document.addEventListener("DOMContentLoaded", () => {
   // Configurable map size
   const mapWidth = 50;
   const mapHeight = 30;
-  const tileSize = 32;
+  let tileSize = 32; // Made tileSize variable for dynamic resizing
 
-  canvas.width = visualViewport.width;
-  canvas.height = visualViewport.height;
+  function resizeCanvas() {
+    // Get the game container dimensions
+    const gameContainer = document.getElementById('gameContainer');
+    const containerWidth = gameContainer.clientWidth;
+    const containerHeight = gameContainer.clientHeight;
+    
+    // Calculate the tile size that would fit the container
+    const horizontalTileSize = Math.floor(containerWidth / mapWidth);
+    const verticalTileSize = Math.floor(containerHeight / mapHeight);
+    
+    // Use the smaller of the two to ensure the map fits both dimensions
+    tileSize = Math.max(Math.min(horizontalTileSize, verticalTileSize), 16); // Minimum tile size of 16px
+    
+    // Set canvas size to match the map dimensions
+    canvas.width = mapWidth * tileSize;
+    canvas.height = mapHeight * tileSize;
+  }
 
-  const map = [];
+  // Initial resize
+  resizeCanvas();
+
+  // Add resize event listener
+  window.addEventListener('resize', () => {
+    resizeCanvas();
+  });
+
   const rocks = [];
   const path = [];
   let towers = [];
@@ -43,8 +65,8 @@ document.addEventListener("DOMContentLoaded", () => {
       baseCost: 15,
       color: "#f00",
       range: 3,
-      damage: 1,
-      reloadSpeed: 500,
+      damage: 3, // Increased from 1
+      reloadSpeed: 400, // Faster shooting
       level: 1,
       count: 0,
       priceScale: 1.4, // 40% increase per tower
@@ -54,8 +76,8 @@ document.addEventListener("DOMContentLoaded", () => {
       baseCost: 25,
       color: "#00f",
       range: 7,
-      damage: 3,
-      reloadSpeed: 1500,
+      damage: 10, // Increased from 3
+      reloadSpeed: 1200, // Slightly faster
       level: 1,
       count: 0,
       priceScale: 1.5, // 50% increase per tower
@@ -65,8 +87,8 @@ document.addEventListener("DOMContentLoaded", () => {
       baseCost: 40,
       color: "#ff0",
       range: 4,
-      damage: 5,
-      reloadSpeed: 1000,
+      damage: 15, // Increased from 5
+      reloadSpeed: 800, // Faster shooting
       level: 1,
       count: 0,
       priceScale: 1.6, // 60% increase per tower
@@ -76,8 +98,8 @@ document.addEventListener("DOMContentLoaded", () => {
       baseCost: 200,
       color: "#fff",
       range: 15,
-      damage: 100,
-      reloadSpeed: 5000,
+      damage: 200, // Increased from 100
+      reloadSpeed: 4000, // Slightly faster
       level: 1,
       count: 0,
       priceScale: 2.0, // 100% increase per tower
@@ -86,9 +108,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Enemy stats
   const enemyStats = {
-    grunt: { health: 10, money: 3, color: "#0f0", speed: 0.5 },
-    fast: { health: 5, money: 1, color: "#f00", speed: 1 },
-    tank: { health: 20, money: 5, color: "#00f", speed: 0.25 },
+    grunt: { 
+      health: 5, // Reduced from 10
+      money: 3,
+      color: "#0f0",
+      speed: 0.5
+    },
+    fast: { 
+      health: 3, // Reduced from 5
+      money: 2, // Increased reward
+      color: "#f00",
+      speed: 1
+    },
+    tank: { 
+      health: 15, // Reduced from 20
+      money: 7, // Increased reward
+      color: "#00f",
+      speed: 0.25
+    },
   };
 
   function updateMoneyLabel() {
@@ -286,8 +323,7 @@ document.addEventListener("DOMContentLoaded", () => {
         money -= upgradeCost;
         tower.level++;
         tower.damage *= 1.5;
-        tower.range *= 1.2;
-        tower.reloadSpeed *= 0.8;
+        tower.reloadSpeed *= 0.85;
         updateMoneyLabel();
         return true;
       }
@@ -296,19 +332,24 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function spawnEnemy() {
-    const enemyTypes = Object.keys(enemyStats);
-    const type = enemyTypes[Math.floor(Math.random() * enemyTypes.length)];
-    const newEnemy = {
-      x: 0,
-      y: 0,
+    const types = ["grunt", "fast", "tank"];
+    const type = types[Math.floor(Math.random() * types.length)];
+    const stats = enemyStats[type];
+    
+    // More gradual health scaling
+    const healthMultiplier = 1 + (waveNumber - 1) * 0.2; // 20% increase per wave instead of exponential
+    
+    const enemy = {
+      x: path[0].x,
+      y: path[0].y,
+      health: stats.health * healthMultiplier,
+      maxHealth: stats.health * healthMultiplier,
       type: type,
-      health: enemyStats[type].health * Math.ceil(Math.pow(waveNumber, 1.3)),
-      money: enemyStats[type].money, // Money value for the enemy
-      speed: enemyStats[type].speed,
-      color: enemyStats[type].color,
-      pathIndex: 0, // To follow the path
+      pathIndex: 0,
+      speed: stats.speed,
+      color: stats.color,
     };
-    enemyqueue.push(newEnemy);
+    enemies.push(enemy);
   }
 
   function updateEnemies() {
@@ -412,11 +453,11 @@ document.addEventListener("DOMContentLoaded", () => {
       if (money >= upgradeCost) {
         money -= upgradeCost;
         selectedTowerElement.level++;
-        selectedTowerElement.damage *= 1.5;
-        selectedTowerElement.range *= 1.2;
-        selectedTowerElement.reloadSpeed *= 0.8;
+        selectedTowerElement.damage *= 1.5; // 50% damage increase
+        selectedTowerElement.reloadSpeed *= 0.85; // 15% faster shooting
+        // Range no longer increases with upgrades
         updateMoneyLabel();
-        showTowerInfo(selectedTowerElement); // Refresh tower info
+        showTowerInfo(selectedTowerElement);
       }
     }
   });
@@ -566,7 +607,7 @@ document.addEventListener("DOMContentLoaded", () => {
       ctx.fillRect(healthBarX, healthBarY, healthBarWidth, healthBarHeight);
 
       // Draw current health
-      const healthPercentage = enemy.health / (enemyStats[enemy.type].health * Math.ceil(Math.pow(waveNumber, 1.3)));
+      const healthPercentage = enemy.health / enemy.maxHealth;
       ctx.fillStyle = getHealthColor(healthPercentage);
       ctx.fillRect(healthBarX, healthBarY, healthBarWidth * healthPercentage, healthBarHeight);
 
@@ -659,15 +700,17 @@ document.addEventListener("DOMContentLoaded", () => {
   function waveFunc() {
     waveNumber++;
     updateWaveCounter();
-    money += waveNumber * 5;
+    money += waveNumber * 7; // Increased wave bonus from 5 to 7
     updateMoneyLabel();
-    for (let i = 0; i < Math.ceil(Math.sqrt(waveNumber)); i++) {
+    // Spawn fewer enemies per wave
+    for (let i = 0; i < Math.ceil(Math.sqrt(waveNumber) * 0.8); i++) {
       spawnEnemy();
     }
   }
 
   // Initialize the game
 
+  let map = [];
   initMap();
   gameLoop();
 });
