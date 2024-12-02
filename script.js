@@ -15,31 +15,34 @@ document.addEventListener("DOMContentLoaded", () => {
   const mapHeight = 30;
   let tileSize = 32; // Made tileSize variable for dynamic resizing
 
+  let resizeTimeout;
+
   function resizeCanvas() {
-    // Get the game container dimensions
-    const gameContainer = document.getElementById('gameContainer');
-    const containerWidth = gameContainer.clientWidth;
-    const containerHeight = gameContainer.clientHeight;
-    
-    // Calculate the tile size that would fit the container
-    const horizontalTileSize = Math.floor(containerWidth / mapWidth);
-    const verticalTileSize = Math.floor(containerHeight / mapHeight);
-    
-    // Use the smaller of the two to ensure the map fits both dimensions
-    tileSize = Math.max(Math.min(horizontalTileSize, verticalTileSize), 16); // Minimum tile size of 16px
-    
-    // Set canvas size to match the map dimensions
-    canvas.width = mapWidth * tileSize;
-    canvas.height = mapHeight * tileSize;
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => {
+      // Get the game container dimensions
+      const gameContainer = document.getElementById('gameContainer');
+      const containerWidth = gameContainer.clientWidth;
+      const containerHeight = gameContainer.clientHeight;
+      
+      // Calculate the tile size that would fit the container
+      const horizontalTileSize = Math.floor(containerWidth / mapWidth);
+      const verticalTileSize = Math.floor(containerHeight / mapHeight);
+      
+      // Use the smaller of the two to ensure the map fits both dimensions
+      tileSize = Math.max(Math.min(horizontalTileSize, verticalTileSize), 16); // Minimum tile size of 16px
+      
+      // Set canvas size to match the map dimensions
+      canvas.width = mapWidth * tileSize;
+      canvas.height = mapHeight * tileSize;
+    }, 100);
   }
 
   // Initial resize
   resizeCanvas();
 
   // Add resize event listener
-  window.addEventListener('resize', () => {
-    resizeCanvas();
-  });
+  window.addEventListener('resize', resizeCanvas);
 
   const rocks = [];
   const path = [];
@@ -392,8 +395,9 @@ document.addEventListener("DOMContentLoaded", () => {
   function isEnemyInRange(tower, enemy) {
     const dx = (enemy.x - tower.x) * tileSize;
     const dy = (enemy.y - tower.y) * tileSize;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-    return distance <= tower.range * tileSize;
+    const distanceSquared = dx * dx + dy * dy;
+    const rangeSquared = (tower.range * tileSize) ** 2;
+    return distanceSquared <= rangeSquared;
   }
 
   let selectedTowerElement = null;
@@ -540,15 +544,17 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  function drawMap() {
+  function drawMapAndTowers() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#222";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
     for (let y = 0; y < mapHeight; y++) {
       for (let x = 0; x < mapWidth; x++) {
         const tileX = x * tileSize;
         const tileY = y * tileSize;
-        
         ctx.beginPath();
         ctx.rect(tileX, tileY, tileSize, tileSize);
-        
         if (map[y][x] === "rock") {
           ctx.fillStyle = "#555";
         } else if (map[y][x] === "path") {
@@ -556,16 +562,11 @@ document.addEventListener("DOMContentLoaded", () => {
         } else if (map[y][x] === "tower") {
           const tower = getTowerAt(x, y);
           if (tower) {
-            // Draw tower base
             ctx.fillStyle = "#333";
             ctx.fill();
-            
-            // Draw tower in its color
             ctx.beginPath();
             ctx.arc(tileX + tileSize/2, tileY + tileSize/2, tileSize/3, 0, Math.PI * 2);
             ctx.fillStyle = tower.color;
-            
-            // Highlight selected tower
             if (tower === selectedTowerElement) {
               ctx.strokeStyle = "#fff";
               ctx.lineWidth = 2;
@@ -679,8 +680,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function gameLoop() {
     if (!menuOpen) {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      drawMap();
+      drawMapAndTowers();
       if (gameStarted) {
         updateEnemies();
         damageEnemies(); // Check for towers damaging enemies
