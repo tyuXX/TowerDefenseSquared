@@ -44,7 +44,7 @@ document.addEventListener("DOMContentLoaded", () => {
       color: "#f00",
       range: 3,
       damage: 1,
-      reloadSpeed: 1000,
+      reloadSpeed: 500,
       level: 1,
       count: 0,
       priceScale: 1.4, // 40% increase per tower
@@ -55,7 +55,7 @@ document.addEventListener("DOMContentLoaded", () => {
       color: "#00f",
       range: 7,
       damage: 3,
-      reloadSpeed: 3000,
+      reloadSpeed: 1500,
       level: 1,
       count: 0,
       priceScale: 1.5, // 50% increase per tower
@@ -66,7 +66,7 @@ document.addEventListener("DOMContentLoaded", () => {
       color: "#ff0",
       range: 4,
       damage: 5,
-      reloadSpeed: 2000,
+      reloadSpeed: 1000,
       level: 1,
       count: 0,
       priceScale: 1.6, // 60% increase per tower
@@ -77,7 +77,7 @@ document.addEventListener("DOMContentLoaded", () => {
       color: "#fff",
       range: 15,
       damage: 100,
-      reloadSpeed: 10000,
+      reloadSpeed: 5000,
       level: 1,
       count: 0,
       priceScale: 2.0, // 100% increase per tower
@@ -251,6 +251,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const tileX = Math.floor(x / tileSize);
     const tileY = Math.floor(y / tileSize);
     const currentCost = getCurrentTowerCost(selectedTower);
+    const stats = towerStats[selectedTower];
 
     if (canPlaceTower(tileX, tileY) && money >= currentCost) {
       const newTower = {
@@ -259,9 +260,13 @@ document.addEventListener("DOMContentLoaded", () => {
         type: selectedTower,
         lastShot: 0,
         level: 1,
+        damage: stats.damage,
+        range: stats.range,
+        reloadSpeed: stats.reloadSpeed,
+        color: stats.color
       };
       towers.push(newTower);
-      map[tileY][tileX] = "tower"; // Update map state
+      map[tileY][tileX] = "tower";
       money -= currentCost;
       towerStats[selectedTower].count++;
       updateMoneyLabel();
@@ -344,30 +349,151 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function isEnemyInRange(tower, enemy) {
-    const dx = enemy.x * tileSize - tower.x * tileSize;
-    const dy = enemy.y * tileSize - tower.y * tileSize;
+    const dx = (enemy.x - tower.x) * tileSize;
+    const dy = (enemy.y - tower.y) * tileSize;
     const distance = Math.sqrt(dx * dx + dy * dy);
-    return distance <= towerStats[tower.type].range * tileSize;
+    return distance <= tower.range * tileSize;
   }
 
+  let selectedTowerElement = null;
+  let totalDamageDealt = new Map(); // Track total damage for each tower
+
+  function showTowerInfo(tower) {
+    const sidebar = document.getElementById('towerInfo');
+    const stats = towerStats[tower.type];
+    
+    // Update tower info
+    document.getElementById('towerName').textContent = stats.name;
+    document.getElementById('towerLevel').textContent = `Level ${tower.level}`;
+    document.getElementById('towerDamage').textContent = Math.round(tower.damage);
+    document.getElementById('towerRange').textContent = Math.round(tower.range);
+    document.getElementById('towerSpeed').textContent = `${(tower.reloadSpeed / 1000).toFixed(1)}s`;
+    document.getElementById('towerTotalDamage').textContent = Math.round(totalDamageDealt.get(tower) || 0);
+    
+    // Update upgrade cost
+    const upgradeCost = Math.floor(getCurrentTowerCost(tower.type) * 0.75 * tower.level);
+    document.getElementById('upgradePrice').textContent = `$${upgradeCost}`;
+    
+    // Show sidebar
+    sidebar.classList.remove('hidden');
+    selectedTowerElement = tower;
+    
+    // Update upgrade button state
+    const upgradeButton = document.getElementById('upgradeButton');
+    upgradeButton.disabled = money < upgradeCost;
+    upgradeButton.style.opacity = money < upgradeCost ? '0.5' : '1';
+  }
+
+  function hideTowerInfo() {
+    const sidebar = document.getElementById('towerInfo');
+    sidebar.classList.add('hidden');
+    selectedTowerElement = null;
+  }
+
+  // Update the click handler
+  canvas.addEventListener("click", function (event) {
+    const pos = getMousePosition(event);
+    const tileX = Math.floor(pos.x / tileSize);
+    const tileY = Math.floor(pos.y / tileSize);
+    
+    const clickedTower = getTowerAt(tileX, tileY);
+    if (clickedTower) {
+      showTowerInfo(clickedTower);
+    } else {
+      hideTowerInfo();
+      placeTower(pos.x, pos.y);
+    }
+  });
+
+  // Add upgrade button handler
+  document.getElementById('upgradeButton').addEventListener('click', () => {
+    if (selectedTowerElement) {
+      const upgradeCost = Math.floor(getCurrentTowerCost(selectedTowerElement.type) * 0.75 * selectedTowerElement.level);
+      if (money >= upgradeCost) {
+        money -= upgradeCost;
+        selectedTowerElement.level++;
+        selectedTowerElement.damage *= 1.5;
+        selectedTowerElement.range *= 1.2;
+        selectedTowerElement.reloadSpeed *= 0.8;
+        updateMoneyLabel();
+        showTowerInfo(selectedTowerElement); // Refresh tower info
+      }
+    }
+  });
+
+  // Add sell button handler
+  document.getElementById('sellButton').addEventListener('click', () => {
+    if (selectedTowerElement) {
+      const sellValue = Math.floor(getCurrentTowerCost(selectedTowerElement.type) * 0.5);
+      money += sellValue;
+      // Remove tower from the game
+      const towerIndex = towers.indexOf(selectedTowerElement);
+      if (towerIndex > -1) {
+        towers.splice(towerIndex, 1);
+        map[selectedTowerElement.y][selectedTowerElement.x] = 'empty';
+        towerStats[selectedTowerElement.type].count--;
+      }
+      updateMoneyLabel();
+      hideTowerInfo();
+      updateTowerSpawners();
+    }
+  });
+
   function damageEnemies() {
+    const now = Date.now();
+    
     for (const tower of towers) {
-      if (tower.reloadcooldown > 0) {
-        tower.reloadcooldown--;
-      } else {
-        for (const enemy of enemies) {
-          if (isEnemyInRange(tower, enemy)) {
-            enemy.health -=
-              towerStats[tower.type].damage * Math.sqrt(tower.level);
-            enemy.health = Math.ceil(enemy.health);
-            tower.reloadcooldown =
-              tower.type.reloadSpeed / Math.floor(Math.sqrt(tower.level));
-            if (enemy.health <= 0) {
-              money += enemy.money; // Increment money by the enemy's value
-              updateMoneyLabel(); // Update the money label
-              enemies.splice(enemies.indexOf(enemy), 1); // Remove dead enemy
-            }
+      // Skip if tower is still on cooldown
+      if (now - tower.lastShot < tower.reloadSpeed) {
+        continue;
+      }
+
+      // Find closest enemy in range
+      let closestEnemy = null;
+      let closestDistance = Infinity;
+
+      for (const enemy of enemies) {
+        if (isEnemyInRange(tower, enemy)) {
+          const dx = (enemy.x - tower.x) * tileSize;
+          const dy = (enemy.y - tower.y) * tileSize;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          
+          if (distance < closestDistance) {
+            closestDistance = distance;
+            closestEnemy = enemy;
           }
+        }
+      }
+
+      // Deal damage to closest enemy
+      if (closestEnemy) {
+        closestEnemy.health -= tower.damage;
+        tower.lastShot = now;
+
+        // Draw attack line
+        ctx.beginPath();
+        ctx.moveTo(tower.x * tileSize + tileSize/2, tower.y * tileSize + tileSize/2);
+        ctx.lineTo(closestEnemy.x * tileSize, closestEnemy.y * tileSize);
+        ctx.strokeStyle = tower.color;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Track damage
+        if (!totalDamageDealt.has(tower)) {
+          totalDamageDealt.set(tower, 0);
+        }
+        totalDamageDealt.set(tower, totalDamageDealt.get(tower) + tower.damage);
+
+        // Update tower info if this tower is selected
+        if (selectedTowerElement === tower) {
+          showTowerInfo(tower);
+        }
+
+        // Remove dead enemies
+        if (closestEnemy.health <= 0) {
+          money += enemyStats[closestEnemy.type].money;
+          updateMoneyLabel();
+          enemies.splice(enemies.indexOf(closestEnemy), 1);
         }
       }
     }
@@ -376,41 +502,97 @@ document.addEventListener("DOMContentLoaded", () => {
   function drawMap() {
     for (let y = 0; y < mapHeight; y++) {
       for (let x = 0; x < mapWidth; x++) {
+        const tileX = x * tileSize;
+        const tileY = y * tileSize;
+        
+        ctx.beginPath();
+        ctx.rect(tileX, tileY, tileSize, tileSize);
+        
         if (map[y][x] === "rock") {
           ctx.fillStyle = "#555";
         } else if (map[y][x] === "path") {
-          ctx.fillStyle = "#d2b48c"; // Light brown
+          ctx.fillStyle = "#d2b48c";
         } else if (map[y][x] === "tower") {
           const tower = getTowerAt(x, y);
-          ctx.fillStyle = tower ? towerStats[tower.type].color : "#0f0";
+          if (tower) {
+            // Draw tower base
+            ctx.fillStyle = "#333";
+            ctx.fill();
+            
+            // Draw tower in its color
+            ctx.beginPath();
+            ctx.arc(tileX + tileSize/2, tileY + tileSize/2, tileSize/3, 0, Math.PI * 2);
+            ctx.fillStyle = tower.color;
+            
+            // Highlight selected tower
+            if (tower === selectedTowerElement) {
+              ctx.strokeStyle = "#fff";
+              ctx.lineWidth = 2;
+              ctx.stroke();
+            }
+          } else {
+            ctx.fillStyle = "#333";
+          }
         } else {
-          ctx.fillStyle = "#0f0"; // Green for the ground
+          ctx.fillStyle = "#222";
         }
-        ctx.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
+        ctx.fill();
       }
     }
-    for (const tower of towers) {
-      ctx.fillStyle = towerStats[tower.type].color;
-      ctx.beginPath();
-      ctx.moveTo(tower.x * tileSize, tower.y * tileSize);
-      ctx.lineTo((tower.x + 1) * tileSize, tower.y * tileSize);
-      ctx.lineTo((tower.x + 1) * tileSize, (tower.y + 1) * tileSize);
-      ctx.lineTo(tower.x * tileSize, (tower.y + 1) * tileSize);
-      ctx.lineTo(tower.x * tileSize, tower.y * tileSize);
-      ctx.stroke();
-      ctx.fillStyle = "#000";
-      ctx.font = tileSize + "px Arial";
-      ctx.fillText(
-        tower.level,
-        (tower.x + 0.5) * tileSize,
-        (tower.y + 0.5) * tileSize
-      );
-    }
   }
+
   function drawEnemies() {
+    ctx.save();
     for (const enemy of enemies) {
+      // Draw enemy
       ctx.fillStyle = enemy.color;
-      ctx.fillRect(enemy.x * tileSize, enemy.y * tileSize, tileSize, tileSize);
+      ctx.beginPath();
+      ctx.arc(
+        enemy.x * tileSize + tileSize / 2,
+        enemy.y * tileSize + tileSize / 2,
+        tileSize / 3,
+        0,
+        Math.PI * 2
+      );
+      ctx.fill();
+
+      // Draw health bar background
+      const healthBarWidth = tileSize * 0.8;
+      const healthBarHeight = 4;
+      const healthBarX = enemy.x * tileSize + tileSize * 0.1;
+      const healthBarY = enemy.y * tileSize - healthBarHeight - 2;
+
+      ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
+      ctx.fillRect(healthBarX, healthBarY, healthBarWidth, healthBarHeight);
+
+      // Draw current health
+      const healthPercentage = enemy.health / (enemyStats[enemy.type].health * Math.ceil(Math.pow(waveNumber, 1.3)));
+      ctx.fillStyle = getHealthColor(healthPercentage);
+      ctx.fillRect(healthBarX, healthBarY, healthBarWidth * healthPercentage, healthBarHeight);
+
+      // Draw health text for bigger enemies
+      if (enemyStats[enemy.type].health > 10) {
+        ctx.fillStyle = '#fff';
+        ctx.font = '10px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(
+          Math.ceil(enemy.health),
+          enemy.x * tileSize + tileSize / 2,
+          enemy.y * tileSize - 8
+        );
+      }
+    }
+    ctx.restore();
+  }
+
+  // Helper function to get health bar color based on percentage
+  function getHealthColor(percentage) {
+    if (percentage > 0.6) {
+      return '#2ecc71'; // Green
+    } else if (percentage > 0.3) {
+      return '#f1c40f'; // Yellow
+    } else {
+      return '#e74c3c'; // Red
     }
   }
 
@@ -421,17 +603,6 @@ document.addEventListener("DOMContentLoaded", () => {
       y: event.clientY - rect.top
     };
   }
-
-  canvas.addEventListener("click", function (event) {
-    const pos = getMousePosition(event);
-    const tileX = Math.floor(pos.x / tileSize);
-    const tileY = Math.floor(pos.y / tileSize);
-    
-    // Try to upgrade first, then try to place if upgrade fails
-    if (!upgradeTower(tileX, tileY)) {
-      placeTower(pos.x, pos.y);
-    }
-  });
 
   document.querySelectorAll('.towerbutton').forEach(button => {
     button.addEventListener('click', () => {

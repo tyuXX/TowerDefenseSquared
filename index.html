@@ -23,7 +23,43 @@
       <button id="skipButton">Skip Wave</button>
       <button id="menuButton1">Menu</button>
     </div>
-    <canvas id="gameCanvas"></canvas>
+
+    <div id="gameContainer">
+      <canvas id="gameCanvas"></canvas>
+      <div id="towerInfo" class="sidebar hidden">
+        <div class="tower-header">
+          <h2 id="towerName">Tower Name</h2>
+          <span id="towerLevel">Level 1</span>
+        </div>
+        <div class="tower-stats">
+          <div class="stat-row">
+            <span class="stat-label">Damage:</span>
+            <span id="towerDamage">0</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Range:</span>
+            <span id="towerRange">0</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Attack Speed:</span>
+            <span id="towerSpeed">0</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Total Damage:</span>
+            <span id="towerTotalDamage">0</span>
+          </div>
+        </div>
+        <div class="tower-upgrade">
+          <div class="upgrade-cost">
+            <span>Upgrade Cost:</span>
+            <span id="upgradePrice">$0</span>
+          </div>
+          <button id="upgradeButton">Upgrade Tower</button>
+          <button id="sellButton">Sell Tower</button>
+        </div>
+      </div>
+    </div>
+
     <div id="menu">
       <div class="menu-content">
         <h2>Game Menu</h2>

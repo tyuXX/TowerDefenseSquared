@@ -122,11 +122,89 @@ button:hover {
     font-weight: 600;
 }
 
+#gameContainer {
+    flex: 1;
+    display: flex;
+    position: relative;
+    margin-top: 48px;
+}
+
 #gameCanvas {
     flex: 1;
     background: var(--secondary);
-    margin-top: 48px;
     position: relative;
+}
+
+.sidebar {
+    width: 250px;
+    background: var(--primary);
+    padding: 20px;
+    border-left: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text);
+    transition: transform 0.3s ease;
+}
+
+.sidebar.hidden {
+    transform: translateX(100%);
+}
+
+.tower-header {
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tower-header h2 {
+    margin: 0 0 8px 0;
+    font-size: 20px;
+}
+
+#towerLevel {
+    display: inline-block;
+    padding: 4px 8px;
+    background: var(--accent);
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.tower-stats {
+    margin-bottom: 24px;
+}
+
+.stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    font-size: 14px;
+}
+
+.stat-label {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.tower-upgrade {
+    padding-top: 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.upgrade-cost {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    font-size: 14px;
+}
+
+#upgradeButton {
+    width: 100%;
+    margin-bottom: 8px;
+    background-color: var(--accent);
+}
+
+#sellButton {
+    width: 100%;
+    background-color: var(--danger);
 }
 
 #menu {
