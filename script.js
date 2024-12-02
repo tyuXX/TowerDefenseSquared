@@ -40,39 +40,47 @@ document.addEventListener("DOMContentLoaded", () => {
   const towerStats = {
     basic: {
       name: "Basic Tower",
-      cost: 10,
+      baseCost: 15,
       color: "#f00",
       range: 3,
       damage: 1,
       reloadSpeed: 1000,
       level: 1,
+      count: 0,
+      priceScale: 1.4, // 40% increase per tower
     },
     sniper: {
       name: "Sniper Tower",
-      cost: 20,
+      baseCost: 25,
       color: "#00f",
       range: 7,
       damage: 3,
       reloadSpeed: 3000,
       level: 1,
+      count: 0,
+      priceScale: 1.5, // 50% increase per tower
     },
     cannon: {
       name: "Cannon Tower",
-      cost: 30,
+      baseCost: 40,
       color: "#ff0",
       range: 4,
       damage: 5,
       reloadSpeed: 2000,
       level: 1,
+      count: 0,
+      priceScale: 1.6, // 60% increase per tower
     },
     railcannon: {
       name: "Railcannon",
-      cost: 1500,
+      baseCost: 200,
       color: "#fff",
       range: 15,
       damage: 100,
       reloadSpeed: 10000,
       level: 1,
+      count: 0,
+      priceScale: 2.0, // 100% increase per tower
     },
   };
 
@@ -95,15 +103,20 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function updateTowerSpawners() {
-    let array = document.getElementsByClassName("towerbutton");
-    for (let index = 0; index < array.length; index++) {
-      array[index].textContent =
-        towerStats[array[index].getAttribute("data-tower")].name +
-        " $" +
-        towerStats[array[index].getAttribute("data-tower")].cost *
-          Math.ceil(Math.sqrt(towers.length));
+    const buttons = document.getElementsByClassName("towerbutton");
+    for (let button of buttons) {
+      const towerType = button.getAttribute("data-tower");
+      const cost = getCurrentTowerCost(towerType);
+      button.title = `${towerStats[towerType].name} - $${cost}`;
+      button.textContent = towerType.charAt(0).toUpperCase();
     }
   }
+
+  function getCurrentTowerCost(type) {
+    const stats = towerStats[type];
+    return Math.floor(stats.baseCost * Math.pow(stats.priceScale, stats.count));
+  }
+
   function initMap() {
     towers = [];
     enemies = [];
@@ -212,8 +225,7 @@ document.addEventListener("DOMContentLoaded", () => {
     return (
       map[y] &&
       map[y][x] === "empty" &&
-      money >=
-        towerStats[selectedTower].cost * Math.ceil(Math.sqrt(towers.length))
+      money >= getCurrentTowerCost(selectedTower)
     );
   }
 
@@ -230,26 +242,52 @@ document.addEventListener("DOMContentLoaded", () => {
     return (
       map[y] &&
       map[y][x] === "tower" &&
-      money >= towerStats[getTowerAt(x, y).type].cost * getTowerAt(x, y).level
+      money >=
+        getCurrentTowerCost(getTowerAt(x, y).type) * getTowerAt(x, y).level
     );
   }
 
   function placeTower(x, y) {
-    if (canPlaceTower(x, y)) {
-      towers.push({ x, y, reloadcooldown: 0, level: 1, type: selectedTower });
-      map[y][x] = "tower";
-      money -=
-        towerStats[selectedTower].cost * Math.ceil(Math.sqrt(towers.length)); // Deduct money for placing a tower
-      updateMoneyLabel(); // Update the money label
-      updateTowerSpawners(); // Update the tower spawners
+    const tileX = Math.floor(x / tileSize);
+    const tileY = Math.floor(y / tileSize);
+    const currentCost = getCurrentTowerCost(selectedTower);
+
+    if (canPlaceTower(tileX, tileY) && money >= currentCost) {
+      const newTower = {
+        x: tileX,
+        y: tileY,
+        type: selectedTower,
+        lastShot: 0,
+        level: 1,
+      };
+      towers.push(newTower);
+      map[tileY][tileX] = "tower"; // Update map state
+      money -= currentCost;
+      towerStats[selectedTower].count++;
+      updateMoneyLabel();
+      updateTowerSpawners();
     }
   }
+
   function upgradeTower(x, y) {
-    if (canUpgradeTower(x, y)) {
-      getTowerAt(x, y).level++;
-      money -= towerStats[getTowerAt(x, y).type].cost * getTowerAt(x, y).level; // Deduct money for upgrading a tower
-      updateMoneyLabel(); // Update the money label
+    const tileX = Math.floor(x / tileSize);
+    const tileY = Math.floor(y / tileSize);
+    const tower = getTowerAt(tileX, tileY);
+
+    if (tower && canUpgradeTower(tileX, tileY)) {
+      const upgradeCost =
+        Math.floor(getCurrentTowerCost(tower.type) * 0.75 * tower.level);
+      if (money >= upgradeCost) {
+        money -= upgradeCost;
+        tower.level++;
+        tower.damage *= 1.5;
+        tower.range *= 1.2;
+        tower.reloadSpeed *= 0.8;
+        updateMoneyLabel();
+        return true;
+      }
     }
+    return false;
   }
 
   function spawnEnemy() {
@@ -378,28 +416,29 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function getMousePosition(event) {
     const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width; // Scaling factor in the x direction
-    const scaleY = canvas.height / rect.height; // Scaling factor in the y direction
-    const x = Math.floor(((event.clientX - rect.left) * scaleX) / tileSize);
-    const y = Math.floor(((event.clientY - rect.top) * scaleY) / tileSize);
-    return { x, y };
+    return {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top
+    };
   }
 
   canvas.addEventListener("click", function (event) {
-    const { x, y } = getMousePosition(event);
-    upgradeTower(x, y);
-    placeTower(x, y);
+    const pos = getMousePosition(event);
+    const tileX = Math.floor(pos.x / tileSize);
+    const tileY = Math.floor(pos.y / tileSize);
+    
+    // Try to upgrade first, then try to place if upgrade fails
+    if (!upgradeTower(tileX, tileY)) {
+      placeTower(pos.x, pos.y);
+    }
   });
 
-  towerSelector.addEventListener("click", function (event) {
-    if (event.target.tagName === "BUTTON") {
-      if (
-        event.target.getAttribute("data-tower") !== selectedTower &&
-        event.target.getAttribute("data-tower") !== undefined
-      ) {
-        selectedTower = event.target.getAttribute("data-tower");
-      }
-    }
+  document.querySelectorAll('.towerbutton').forEach(button => {
+    button.addEventListener('click', () => {
+      selectedTower = button.getAttribute('data-tower');
+      document.querySelectorAll('.towerbutton').forEach(b => b.style.border = 'none');
+      button.style.border = '2px solid white';
+    });
   });
 
   startButton.addEventListener("click", function () {
